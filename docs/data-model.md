@@ -61,6 +61,7 @@ erDiagram
 | `profiles` | メンバー（`auth.users` と 1対1） | 表示名、アイコン、自己紹介、相談受付ステータス（open / busy / paused）、**role（member / admin）**、**status（active / suspended）**、招待した人、使った招待リンク、文字サイズ |
 | `invite_links` | 招待リンク | **トークンのハッシュ**（本体は保存しない）、発行者、メモ、使用回数の上限と実績、有効期限、無効化日時 |
 | `admin_audit_logs` | 管理操作の記録 | 誰が・何を・誰に（格上げ、停止、リンク発行など） |
+| `invite_claims` | 招待の予約 | どの連絡先（メール／電話番号）がどの招待リンクで登録するか、ユーザー作成を許す期限（1時間）、使用済みか。**登録前フックがこれを見てユーザー作成を許可する**。アプリからは直接読めない |
 
 ### 3.2 できること
 
@@ -152,7 +153,11 @@ erDiagram
 
 | 関数 | 呼べる人 | やること |
 | --- | --- | --- |
-| `redeem_invite_link(token, 表示名)` | ログイン直後でプロフィール未作成の人 | リンクの有効性・回数を確認し、プロフィールと通知設定を作る |
+| `check_invite_link(token)` | だれでも（未ログイン可） | リンクが有効か、招待した人の名前を返す |
+| `claim_invite(token, メール or 電話)` | だれでも（未ログイン可） | 有効なリンクなら、その連絡先での登録を予約する |
+| `hook_before_user_created(event)` | Supabase Auth だけ | ユーザー作成の直前に呼ばれ、予約がなければ拒否する |
+| `redeem_invite(表示名, 規約バージョン)` | ログイン直後でプロフィール未作成の人 | ログイン中の連絡先の予約を使い、リンクの回数を数え、プロフィール（規約同意の記録つき）と通知設定を作る |
+| `my_invite_status()` | ログイン中の人 | メンバーか、停止中か、参加手続きを続けられるか（画面の振り分け用） |
 | `create_invite_link(有効期間, 回数, メモ)` | 管理者 | トークンを作り、ハッシュだけ保存。トークン本体は戻り値でだけ渡す |
 | `revoke_invite_link(id)` | 管理者 | リンクを無効化 |
 | `set_member_role(id, role)` | 管理者 | 格上げ／一般に戻す。**最後の管理者は戻せない** |
@@ -212,8 +217,8 @@ sequenceDiagram
 
 | 項目 | 内容 |
 | --- | --- |
-| 招待されていない人のログイン | メール OTP では誰でも Supabase のユーザー自体は作れてしまう。ただし**プロフィールがないと何も見られない**ので実害はない。加えて、Supabase Auth の「ユーザー作成前フック」で招待トークンの確認を入れることも検討 |
-| 最初の管理者 | 初回だけ SQL で `profiles` に role = admin の行を入れる |
+| 招待されていない人の登録 | **登録前フック**（`hook_before_user_created`）で、招待の予約（`invite_claims`）がない連絡先のユーザー作成を拒否する。万一ユーザーができても、プロフィールがなければ何も見られない |
+| 最初の管理者 | 登録前フックを有効にする前に、ダッシュボードでユーザーを作り、SQL で `profiles` に role = admin の行を入れる（README 参照） |
 | ファイル | Supabase Storage に `attachments`（非公開）バケットを作る。パスに相談 ID か会話 ID を含め、Storage のポリシーで同じ判定（相談を見られる／会話の参加者）を行う |
 | リアルタイム | `consultation_messages`・`direct_messages`・`discussion_maps`・`notifications` を Realtime の対象にする。Realtime も RLS に従う |
 | メール・プッシュ通知 | `notifications` に入った行を Edge Function が拾い、通知設定に従って送る（送ったら `emailed_at`／`pushed_at` を記録） |

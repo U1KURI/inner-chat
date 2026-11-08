@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP 1
 -- users
-insert into auth.users values
+insert into auth.users (id, email) values
  ('00000000-0000-0000-0000-00000000000a','a@x'),('00000000-0000-0000-0000-00000000000b','b@x'),
  ('00000000-0000-0000-0000-00000000000c','c@x'),('00000000-0000-0000-0000-00000000000d','d@x'),
  ('00000000-0000-0000-0000-00000000000e','e@x');
@@ -20,19 +20,50 @@ grant execute on all functions in schema pg_temp to authenticated;
 create temp table tok(name text, t text); grant all on tok to authenticated;
 create temp table ids(name text, id uuid); grant all on ids to authenticated;
 
--- 招待リンク
+-- 招待リンク → 予約 → 登録前フック → 参加
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 insert into tok select 'b', public.create_invite_link(interval '7 days', 3, 'B,C,D用');
 reset role;
+create or replace function pg_temp.as_anon() returns void language plpgsql as $$
+begin perform set_config('request.jwt.claim.sub', '', false); execute 'set role anon'; end $$;
+grant execute on function pg_temp.as_anon() to anon;
+grant select on tok to anon;
+select pg_temp.as_anon();
+select pg_temp.check((public.check_invite_link((select t from tok))->>'inviter') = '山田', 'anon checks invite link');
+select pg_temp.check((public.check_invite_link('wrong')->>'reason') = 'not_found', 'anon: bad token');
+select pg_temp.check((public.claim_invite((select t from tok), 'B@x'))->>'ok' = 'true', 'claim for b@x');
+select pg_temp.check((public.claim_invite((select t from tok), null, '+81 90-1234-5678'))->>'ok' = 'true', 'claim for phone');
+select pg_temp.check((public.claim_invite((select t from tok), 'd@x'))->>'ok' = 'true', 'claim for d@x');
+select pg_temp.expect_fail($q$select public.hook_before_user_created('{}')$q$, 'anon cannot call hook');
+select pg_temp.expect_fail($q$select count(*) from public.invite_claims$q$, 'anon cannot read claims');
+reset role;
+set role supabase_auth_admin;
+select pg_temp.check(public.hook_before_user_created('{"user":{"email":"b@x","phone":""}}') = '{}', 'hook allows claimed email');
+select pg_temp.check(public.hook_before_user_created('{"user":{"email":"","phone":"819012345678"}}') = '{}', 'hook allows claimed phone');
+select pg_temp.check(public.hook_before_user_created('{"user":{"email":"e@x","phone":""}}') ? 'error', 'hook rejects unclaimed email');
+reset role;
+-- C は電話番号で登録
+update auth.users set phone = '819012345678', email = null where id = '00000000-0000-0000-0000-00000000000c';
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
 select pg_temp.check((select count(*) from public.consultations) = 0, 'no profile yet -> sees nothing');
-select public.redeem_invite_link((select t from tok), '佐藤');
-select pg_temp.as_user('00000000-0000-0000-0000-00000000000c'); select public.redeem_invite_link((select t from tok), '高橋');
-select pg_temp.as_user('00000000-0000-0000-0000-00000000000d'); select public.redeem_invite_link((select t from tok), '中村');
+select pg_temp.check((public.my_invite_status()->>'can_join') = 'true', 'B can join');
+select pg_temp.expect_fail($q$select public.redeem_invite('佐藤', '')$q$, 'redeem without terms');
+select public.redeem_invite('佐藤', '2026-11-08');
+select pg_temp.check((select terms_version from public.profiles where id = auth.uid()) = '2026-11-08', 'terms recorded');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c'); select public.redeem_invite('高橋', '2026-11-08');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d'); select public.redeem_invite('中村', '2026-11-08');
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
-select pg_temp.expect_fail($q$select public.redeem_invite_link((select t from tok), '他人')$q$, 'invite link max uses');
-select pg_temp.expect_fail($q$select public.redeem_invite_link('wrong', '他人')$q$, 'bad token');
+select pg_temp.check((public.my_invite_status()->>'can_join') = 'false', 'E has no invitation');
+select pg_temp.expect_fail($q$select public.redeem_invite('他人', '2026-11-08')$q$, 'redeem without claim');
 select pg_temp.check((select count(*) from public.profiles) = 0, 'non-member cannot read profiles');
+reset role;
+select pg_temp.as_anon();
+select pg_temp.check((public.check_invite_link((select t from tok))->>'reason') = 'used', 'link used up after 3 joins');
+select pg_temp.check((public.claim_invite((select t from tok), 'e@x'))->>'reason' = 'used', 'cannot claim used link');
+reset role;
+set role supabase_auth_admin;
+select pg_temp.check(public.hook_before_user_created('{"user":{"email":"b@x","phone":""}}') ? 'error', 'consumed claim no longer allows signup');
+reset role;
 
 -- 一般メンバーは招待リンクを作れない・ロールを変えられない
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
