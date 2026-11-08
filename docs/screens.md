@@ -1,6 +1,6 @@
 # 画面一覧・ワイヤーフレーム（v0.1）
 
-> 要件：[requirements.md](./requirements.md) ／ 決定記録：[decisions.md](./decisions.md)
+> 要件：[requirements.md](./requirements.md) ／ 決定記録：[decisions.md](./decisions.md) ／ HTML 版：[wireframes.html](./wireframes.html)
 >
 > ワイヤーフレームはスマホ表示を基本に描いている（レスポンシブ。PC 版のレイアウトは「0. 共通レイアウト」参照）。
 > 図の右端の枠線は、全角文字でずれないよう省略している。

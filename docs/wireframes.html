@@ -1,0 +1,933 @@
+<meta charset="utf-8">
+<title>inner-chat ワイヤーフレーム</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: 左寄せの見出し → 画面一覧表 → 区分ごとにスマホ枠を並べたボード。図面のような注記つき */
+:root {
+  --bg: #e9edf1;          /* ボード */
+  --paper: #f7f9fb;       /* 説明ブロック */
+  --screen: #ffffff;      /* 画面の地 */
+  --ink: #1d2733;
+  --ink-soft: #5b6878;
+  --ink-faint: #8a96a5;
+  --line: #ccd4dd;
+  --line-strong: #3a4553;
+  --fill: #eef2f6;        /* 入力欄・プレースホルダ */
+  --accent: #2c5d8f;      /* 藍 */
+  --accent-soft: #dde8f3;
+  --on-accent: #ffffff;
+  --note: #b8560f;        /* 注記 */
+  --ok: #2f7d4f;
+  --warn: #a8740c;
+  --danger: #b03a3a;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141a21; --paper: #1b232c; --screen: #212a34; --ink: #e3e9ef; --ink-soft: #a6b2bf; --ink-faint: #75828f;
+    --line: #36424f; --line-strong: #8d9aa8; --fill: #2a3440; --accent: #7fb0e0; --accent-soft: #24384d; --on-accent: #0f1822;
+    --note: #f0a05c; --ok: #6cc290; --warn: #e2b553; --danger: #ec8080; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141a21; --paper: #1b232c; --screen: #212a34; --ink: #e3e9ef; --ink-soft: #a6b2bf; --ink-faint: #75828f;
+  --line: #36424f; --line-strong: #8d9aa8; --fill: #2a3440; --accent: #7fb0e0; --accent-soft: #24384d; --on-accent: #0f1822;
+  --note: #f0a05c; --ok: #6cc290; --warn: #e2b553; --danger: #ec8080; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+h1 { font-size: 30px; font-weight: 700; letter-spacing: .01em; }
+h2 { font-size: 20px; font-weight: 700; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.lead { color: var(--ink-soft); max-width: 62ch; margin: 8px 0 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header + nav */
+.head { display: flex; flex-direction: column; gap: 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--ink-soft); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+.toc a { text-decoration: none; color: var(--ink); border: 1px solid var(--line); background: var(--paper); padding: 6px 12px; border-radius: 999px; font-size: 13px; }
+.toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+/* section */
+section { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 16px; }
+.sec-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.sec-head .code { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+.sec-head p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+
+/* screen list table */
+.table-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--ink-soft); font-size: 12px; letter-spacing: .04em; }
+td.id { font-family: var(--font-mono); color: var(--accent); white-space: nowrap; }
+td a { text-decoration: none; }
+tr:last-child td { border-bottom: 0; }
+
+/* board */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(296px, 1fr)); gap: 32px 24px; justify-items: center; }
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; width: 296px; max-width: 100%; }
+figcaption { display: flex; flex-direction: column; gap: 4px; }
+figcaption .t { display: flex; gap: 8px; align-items: baseline; }
+figcaption .id { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+figcaption .name { font-weight: 700; }
+figcaption ul { margin: 0; padding-left: 1.1em; color: var(--ink-soft); font-size: 12.5px; }
+figcaption li::marker { color: var(--note); }
+
+/* phone frame */
+.phone {
+  width: 296px; max-width: 100%; height: 600px; border: 2px solid var(--line-strong); border-radius: 30px;
+  background: var(--screen); overflow: hidden; display: flex; flex-direction: column; font-size: 12.5px; line-height: 1.5;
+}
+.notch { height: 20px; display: flex; justify-content: center; align-items: center; flex: none; }
+.notch::after { content: ""; width: 72px; height: 6px; border-radius: 6px; background: var(--line); }
+.top { display: flex; align-items: center; gap: 8px; padding: 6px 14px 10px; border-bottom: 1px solid var(--line); flex: none; }
+.top .title { font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top .act { color: var(--accent); font-weight: 500; }
+.ic { color: var(--ink-soft); font-size: 13px; }
+.body { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.body.center { justify-content: center; text-align: center; }
+.tabbar { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); flex: none; padding: 6px 0 12px; }
+.tabbar span { text-align: center; font-size: 10.5px; color: var(--ink-faint); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tabbar span::before { content: ""; width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid currentColor; }
+.tabbar span.on { color: var(--accent); }
+.composer { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); padding: 8px 12px 14px; flex: none; }
+.composer .input { flex: 1; }
+
+/* parts */
+.muted { color: var(--ink-soft); }
+.faint { color: var(--ink-faint); font-size: 11.5px; }
+.small { font-size: 11.5px; }
+.label { font-size: 11.5px; color: var(--ink-soft); font-weight: 500; }
+.input { border: 1px solid var(--line); background: var(--fill); border-radius: 8px; padding: 7px 10px; color: var(--ink-soft); min-height: 32px; }
+.input.tall { min-height: 76px; }
+.btn { display: block; text-align: center; border-radius: 8px; padding: 9px 12px; font-weight: 700; background: var(--accent); color: var(--on-accent); border: 0; font: inherit; font-weight: 700; }
+.btn.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn.plain { background: transparent; color: var(--ink-soft); border: 1px solid var(--line); font-weight: 500; }
+.btn.sm { display: inline-block; padding: 4px 10px; font-size: 11.5px; }
+.btns { display: flex; gap: 8px; }
+.btns > * { flex: 1; }
+.card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.card.hl { border-color: var(--accent); background: var(--accent-soft); }
+.card .ttl { font-weight: 700; }
+.meta { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 11px; color: var(--ink-soft); }
+.chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.chip.acc { border-color: var(--accent); color: var(--accent); }
+.chip.ok { border-color: var(--ok); color: var(--ok); }
+.chip.warn { border-color: var(--warn); color: var(--warn); }
+.chip.danger { border-color: var(--danger); color: var(--danger); }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.tag { font-size: 11px; color: var(--accent); }
+.row { display: flex; align-items: center; gap: 8px; }
+.row .grow { flex: 1; min-width: 0; }
+.between { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.av { width: 28px; height: 28px; border-radius: 50%; background: var(--fill); border: 1px solid var(--line); flex: none; }
+.av.lg { width: 56px; height: 56px; }
+.hr { height: 1px; background: var(--line); }
+.divider { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--ink-soft); }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.list { display: flex; flex-direction: column; }
+.list > div { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.list > div:last-child { border-bottom: 0; }
+.opt { display: flex; gap: 8px; align-items: flex-start; }
+.radio, .check { width: 14px; height: 14px; border: 1.5px solid var(--line-strong); flex: none; margin-top: 3px; position: relative; }
+.radio { border-radius: 50%; }
+.check { border-radius: 3px; }
+.radio.on::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; background: var(--accent); }
+.check.on { background: var(--accent); border-color: var(--accent); }
+.check.on::after { content: ""; position: absolute; left: 3.5px; top: 0.5px; width: 4px; height: 8px; border: solid var(--on-accent); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.indent { border-left: 2px solid var(--accent); padding-left: 10px; display: flex; flex-direction: column; gap: 6px; }
+.hint { background: var(--fill); border-radius: 8px; padding: 8px 10px; font-size: 11.5px; color: var(--ink-soft); }
+.note { color: var(--note); font-size: 11px; }
+.fab { align-self: flex-end; background: var(--accent); color: var(--on-accent); border-radius: 999px; padding: 8px 14px; font-weight: 700; font-size: 12px; }
+.codes { display: flex; gap: 6px; justify-content: center; }
+.codes span { width: 34px; height: 42px; border: 1px solid var(--line-strong); border-radius: 6px; display: grid; place-items: center; font-family: var(--font-mono); font-size: 16px; }
+.codes span.empty { border-color: var(--line); }
+.logo { font-family: var(--font-mono); font-weight: 500; font-size: 18px; letter-spacing: .02em; }
+.bubble { max-width: 82%; padding: 7px 10px; border-radius: 12px; background: var(--fill); }
+.bubble.me { align-self: flex-end; background: var(--accent-soft); }
+.sys { text-align: center; font-size: 11px; color: var(--ink-faint); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+.stars { color: var(--warn); letter-spacing: 1px; }
+
+/* 議論マップ */
+.map { border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: var(--screen); }
+.map .mh { display: flex; justify-content: space-between; align-items: center; font-weight: 700; color: var(--accent); font-size: 12px; }
+.map dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 3px 8px; font-size: 11.5px; }
+.map dt { color: var(--ink-soft); white-space: nowrap; }
+.map dd { margin: 0; }
+.phase { display: grid; grid-template-columns: repeat(5, 1fr); position: relative; padding-top: 2px; }
+.phase::before { content: ""; position: absolute; left: 10%; right: 10%; top: 9px; height: 2px; background: var(--line); }
+.phase span { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 9.5px; color: var(--ink-faint); position: relative; text-align: center; line-height: 1.25; }
+.phase span::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); background: var(--screen); }
+.phase span.done::before { background: var(--accent); border-color: var(--accent); }
+.phase span.now { color: var(--accent); font-weight: 700; }
+.phase span.now::before { width: 16px; height: 16px; margin-top: -2px; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.phase.unknown span::before { border-style: dashed; }
+.map.empty { border-style: dashed; border-color: var(--line-strong); }
+
+/* PC frame */
+.pc-scroll { overflow-x: auto; padding-bottom: 8px; }
+.pc { width: 1000px; height: 560px; border: 2px solid var(--line-strong); border-radius: 12px; background: var(--screen); display: grid; grid-template-columns: 180px 1fr 300px; overflow: hidden; font-size: 12.5px; line-height: 1.5; }
+.pc .side { border-right: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.pc .side .logo { margin-bottom: 12px; font-size: 15px; }
+.pc .nav { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 8px; color: var(--ink-soft); }
+.pc .nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.pc .main { display: flex; flex-direction: column; min-width: 0; }
+.pc .right { border-left: 1px solid var(--line); padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: var(--paper); }
+.pc .right .map { border: 0; padding: 0; background: transparent; }
+
+.foot { color: var(--ink-soft); font-size: 13px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: no-preference) { .toc a { transition: border-color .15s, color .15s; } }
+</style>
+
+<div class="wrap">
+
+<header class="head">
+  <div class="eyebrow">inner-chat ・ wireframes v0.1</div>
+  <h1>inner-chat ワイヤーフレーム</h1>
+  <p class="lead">知人だけが入れる、「できること」と相談をつなぐチャットの画面構成です。見た目の最終デザインではなく、画面に何があるか・どう動くかを確認するためのものです。スマホを基本に描き、相談詳細だけ PC 版も載せています。</p>
+  <div class="legend">
+    <span><span class="chip acc">青</span> 操作できる要素・強調</span>
+    <span><span class="note">● オレンジの注記</span> 仕様上のポイント</span>
+    <span>ID は <code>docs/screens.md</code> の画面一覧と対応</span>
+  </div>
+  <nav class="toc" aria-label="区分">
+    <a href="#list">画面一覧</a>
+    <a href="#auth">A 登録・ログイン</a>
+    <a href="#consult">B 相談</a>
+    <a href="#pc">B-03 PC版</a>
+    <a href="#invite">B 関係者・招待</a>
+    <a href="#members">C メンバー</a>
+    <a href="#dm">D DM・E 通知</a>
+    <a href="#mypage">F マイページ</a>
+    <a href="#admin">G 管理</a>
+  </nav>
+</header>
+
+<!-- ============ 画面一覧 ============ -->
+<section id="list">
+  <div class="sec-head"><h2>画面一覧</h2><p>全32画面＋共通ダイアログ4つ。リンクのある画面はこのページにワイヤーフレームがあります。</p></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>画面</th><th>主な内容</th></tr></thead>
+      <tbody>
+        <tr><td class="id"><a href="#auth">A-01</a></td><td>招待ウェルカム</td><td>招待した管理者名、サービス説明、はじめる</td></tr>
+        <tr><td class="id"><a href="#auth">A-02</a></td><td>連絡先入力</td><td>メール（標準）／電話番号（SMS）</td></tr>
+        <tr><td class="id"><a href="#auth">A-03</a></td><td>確認コード入力</td><td>6桁コード、再送</td></tr>
+        <tr><td class="id"><a href="#auth">A-04</a></td><td>規約・AI 利用の同意</td><td>利用規約、AI の説明、同意</td></tr>
+        <tr><td class="id"><a href="#auth">A-05</a></td><td>初回プロフィール設定</td><td>できることタグ、ひとこと</td></tr>
+        <tr><td class="id">A-06</td><td>ログイン</td><td>メール／電話番号 → A-03</td></tr>
+        <tr><td class="id">A-07</td><td>招待リンク無効</td><td>期限切れ・使用済みの案内</td></tr>
+        <tr><td class="id"><a href="#consult">B-01</a></td><td>相談一覧（ホーム）</td><td>絞り込み、関係者招待のバナー、現在地表示</td></tr>
+        <tr><td class="id"><a href="#consult">B-02</a></td><td>相談を投稿</td><td>公開範囲、関係者、管理者閲覧、AI 利用</td></tr>
+        <tr><td class="id"><a href="#consult">B-03</a></td><td>相談詳細</td><td>議論マップ、本文、反応、スレッド</td></tr>
+        <tr><td class="id"><a href="#consult">B-04</a></td><td>議論マップ詳細</td><td>手修正、今すぐ更新、過去の版</td></tr>
+        <tr><td class="id"><a href="#consult">B-05</a></td><td>相談の設定</td><td>ステータス、公開範囲、管理者閲覧、AI（投稿者のみ）</td></tr>
+        <tr><td class="id"><a href="#invite">B-06</a></td><td>関係者</td><td>参加中、承認待ち、外す、抜ける</td></tr>
+        <tr><td class="id"><a href="#invite">B-07</a></td><td>関係者を招待</td><td>メンバー選択、ひとこと</td></tr>
+        <tr><td class="id"><a href="#invite">B-08</a></td><td>公開範囲を絞る</td><td>これまでの参加者から関係者を選ぶ</td></tr>
+        <tr><td class="id"><a href="#invite">B-09</a></td><td>関係者招待（承認前）</td><td>議論マップ概要版、参加・質問・辞退</td></tr>
+        <tr><td class="id"><a href="#invite">B-10</a></td><td>招待についての問い合わせ</td><td>招待に紐づく会話</td></tr>
+        <tr><td class="id"><a href="#members">C-01</a></td><td>メンバー一覧・検索</td><td>タグ検索、相談受付ステータス</td></tr>
+        <tr><td class="id"><a href="#members">C-02</a></td><td>メンバープロフィール</td><td>できること、勉強中、メッセージ</td></tr>
+        <tr><td class="id"><a href="#dm">D-01</a></td><td>DM 一覧</td><td>未読、グループ</td></tr>
+        <tr><td class="id"><a href="#dm">D-02</a></td><td>DM 会話</td><td>既読、添付、元の相談へのリンク</td></tr>
+        <tr><td class="id">D-03</td><td>新しいメッセージ</td><td>宛先選択（複数でグループ）</td></tr>
+        <tr><td class="id"><a href="#dm">E-01</a></td><td>通知一覧</td><td>反応・招待・おすすめ相談など</td></tr>
+        <tr><td class="id"><a href="#mypage">F-01</a></td><td>マイページ</td><td>各設定への入口</td></tr>
+        <tr><td class="id">F-02</td><td>プロフィール編集</td><td>表示名、アイコン、ステータス</td></tr>
+        <tr><td class="id"><a href="#mypage">F-03</a></td><td>できること編集</td><td>経験レベル、実績、勉強中</td></tr>
+        <tr><td class="id">F-04〜F-07</td><td>アカウント・通知・ブロック・表示設定</td><td>連絡先変更、退会、文字サイズ、ホーム画面に追加</td></tr>
+        <tr><td class="id">G-01</td><td>管理ホーム</td><td>未対応の通報、メンバー数</td></tr>
+        <tr><td class="id"><a href="#admin">G-02</a></td><td>メンバー管理</td><td>管理者に格上げ／戻す、停止</td></tr>
+        <tr><td class="id"><a href="#admin">G-03</a></td><td>招待リンク</td><td>発行、履歴、無効化</td></tr>
+        <tr><td class="id"><a href="#admin">G-04</a></td><td>通報</td><td>対象の閲覧、対応記録</td></tr>
+        <tr><td class="id">G-05</td><td>タグ整理</td><td>統合・名前変更</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ A ============ -->
+<section id="auth">
+  <div class="sec-head"><span class="code">A</span><h2>登録・ログイン</h2><p>招待リンクから入り、パスワードなしで登録します。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="body center" style="gap:16px">
+          <div class="logo">inner-chat</div>
+          <div><b>山田さん</b>から招待が届いています</div>
+          <p class="muted" style="margin:0">知り合い同士で「できること」を持ち寄って、ちょっとした相談を気軽にできる場所です。</p>
+          <div class="hint" style="text-align:left">・パスワードは不要です<br>・アプリのインストールも不要です</div>
+          <div class="btn">はじめる</div>
+          <div class="small muted">登録済みの方は <span style="color:var(--accent)">ログイン</span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">A-01</span><span class="name">招待ウェルカム</span></div>
+        <ul><li>リンクが期限切れ・使用済みなら A-07 へ</li><li>LINE を使わない人にも「インストール不要」を最初に伝える</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">登録</span></div>
+        <div class="body">
+          <div class="label">メールアドレス</div>
+          <div class="input">taro@example.com</div>
+          <div class="btn">確認コードを送る</div>
+          <div class="hr"></div>
+          <div class="small muted">メールを使いたくない方は</div>
+          <div class="small" style="color:var(--accent)">→ 電話番号（SMS）で登録する</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">A-02</span><span class="name">連絡先入力</span></div>
+        <ul><li>メールが標準。SMS は希望者だけが選ぶ</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">確認コード</span></div>
+        <div class="body">
+          <div><b>taro@example.com</b> に<br>6桁のコードを送りました</div>
+          <div class="codes"><span>4</span><span>8</span><span>1</span><span class="empty"></span><span class="empty"></span><span class="empty"></span></div>
+          <div class="hint">届かない場合<br>・迷惑メールフォルダを確認<br>・コードを再送する（60秒後）</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">A-03</span><span class="name">確認コード入力</span></div>
+        <ul><li>試行回数に上限を設ける</li><li>新規なら A-04、既存なら B-01 へ</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">ご利用にあたって</span></div>
+        <div class="body">
+          <div class="between"><b>利用規約</b><span class="small" style="color:var(--accent)">全文を見る ›</span></div>
+          <div class="hr"></div>
+          <b>AI の利用について</b>
+          <div class="small">相談の本文とスレッドは、要約・タグ付け・議論の流れの整理のため、AI（Anthropic の Claude）に送られます。</div>
+          <div class="hint">・「関係者のみ」の相談も対象です<br>・DM は送られません<br>・相談ごとに AI を使わない設定にできます<br>・送った内容が AI の学習に使われることはありません</div>
+          <div class="opt"><span class="check"></span><span>利用規約と AI の利用に同意します</span></div>
+          <div class="btn">同意して次へ</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">A-04</span><span class="name">規約・AI 利用の同意</span></div>
+        <ul><li>AI 利用の告知（AI-1〜AI-4）をここで行う</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="title" style="text-align:center">プロフィール（2 / 2）</span></div>
+        <div class="body">
+          <div><b>あなたの「できること」を教えてください</b><div class="faint">あとからいつでも追加・変更できます</div></div>
+          <div class="input">🔍 タグを検索・追加</div>
+          <div class="label">よく使われているタグ</div>
+          <div class="tags"><span class="chip">Web制作</span><span class="chip">デザイン</span><span class="chip">税務</span><span class="chip">子育て</span><span class="chip">写真</span><span class="chip">英語</span><span class="chip">IT相談</span><span class="chip">料理</span></div>
+          <div class="label">選択中</div>
+          <div class="tags"><span class="chip on">Web制作 ×</span><span class="chip on">写真 ×</span></div>
+          <div class="label">ひとこと（任意）</div>
+          <div class="input">平日夜なら相談乗れます</div>
+          <div class="btns"><span class="btn plain">あとで</span><span class="btn">はじめる</span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">A-05</span><span class="name">初回プロフィール設定</span></div>
+        <ul><li>1/2 は表示名・アイコン</li><li>タグは候補から選ぶ形にして表記ゆれを防ぐ</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ============ B 相談 ============ -->
+<section id="consult">
+  <div class="sec-head"><span class="code">B</span><h2>相談</h2><p>ふわっとした相談から会話が始まる中心の画面群です。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="title">相談</span><span class="ic">🔔3</span></div>
+        <div class="body">
+          <div class="card hl"><div class="between small"><span>✉ 関係者招待が1件届いています</span><span>›</span></div></div>
+          <div class="tags"><span class="chip on">すべて</span><span class="chip">自分の</span><span class="chip">関係者</span><span class="chip">募集中 ▾</span></div>
+          <div class="card">
+            <div class="ttl">店のWebサイトをなんとかしたい</div>
+            <div class="meta"><span class="chip">🌐 全体</span><span class="chip ok">募集中</span><span>佐藤・2時間前</span></div>
+            <div class="small muted">何から手をつければいいか…</div>
+            <div class="tags"><span class="tag">#Web制作</span><span class="tag">#マーケ</span></div>
+            <div class="meta"><span>💬 5</span><span>🙋 話聞けます 2</span></div>
+            <div class="small" style="color:var(--accent)">📍 現在地：② 情報・選択肢集め</div>
+          </div>
+          <div class="card">
+            <div class="ttl">実家の相続手続きについて</div>
+            <div class="meta"><span class="chip">🔒 関係者のみ 4</span><span class="chip warn">進行中</span><span>鈴木・昨日</span></div>
+            <div class="meta"><span>💬 12</span></div>
+            <div class="small" style="color:var(--accent)">📍 現在地：③ 検討・比較</div>
+          </div>
+          <div class="card">
+            <div class="ttl">子どもの習い事、何がいい？</div>
+            <div class="meta"><span class="chip">🌐 全体</span><span class="chip ok">募集中</span><span class="chip">AI オフ</span><span>田中・3日前</span></div>
+            <div class="meta"><span>💬 1</span></div>
+          </div>
+          <span class="fab">＋ 相談する</span>
+        </div>
+        <div class="tabbar"><span class="on">相談</span><span>メンバー</span><span>DM</span><span>マイ</span></div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-01</span><span class="name">相談一覧（ホーム）</span></div>
+        <ul><li>自分が見られる相談だけ表示</li><li>各相談に議論マップの現在地を表示</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">✕</span><span class="title">相談する</span><span class="act">投稿</span></div>
+        <div class="body">
+          <div class="label">タイトル</div>
+          <div class="input">店のWebサイトをなんとかしたい</div>
+          <div class="label">内容（ふわっとで大丈夫です）</div>
+          <div class="input tall">小さな飲食店をやっています。今のサイトが古くて…</div>
+          <div class="hint">💡 やりたいこと／今の状況／期限や予算 が書いてあると、話が進みやすくなります</div>
+          <div class="divider">公開範囲</div>
+          <label class="opt" for="b02-all"><input type="radio" name="b02-scope" id="b02-all" value="all" checked hidden><span class="radio" data-for="b02-all"></span><span>🌐 全体に公開</span></label>
+          <label class="opt" for="b02-rel"><input type="radio" name="b02-scope" id="b02-rel" value="rel" hidden><span class="radio" data-for="b02-rel"></span><span>🔒 関係者のみ</span></label>
+          <div class="indent" id="b02-relbox" hidden>
+            <div class="between"><span class="label">関係者</span><span class="chip acc">＋ 選ぶ</span></div>
+            <div class="tags"><span class="chip">高橋 ×</span><span class="chip">伊藤 ×</span></div>
+            <div class="faint">選んだ人には招待が届き、承認すると参加します</div>
+            <div class="opt"><span class="check on"></span><span><b>管理者の閲覧を許可する</b><br><span class="small muted">調整や仲裁が必要になった場合に備えて、管理者が内容を確認できるようにします</span></span></div>
+          </div>
+          <div class="divider">AI</div>
+          <label class="opt" for="b02-ai"><input type="checkbox" id="b02-ai" checked hidden><span class="check" data-for="b02-ai"></span><span><b>AI を使う</b><br><span class="small muted" id="b02-ai-text">内容を AI が要約し、議論の流れを整理します。合いそうな人へのおすすめにも使います（全体公開のみ）</span></span></label>
+          <div class="label">タグ（任意・AI が提案します）</div>
+          <div><span class="chip acc">＋ タグを追加</span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-02</span><span class="name">相談を投稿</span><span class="chip acc">操作できます</span></div>
+        <ul><li>「関係者のみ」を押すと関係者選択と管理者閲覧（初期オン）が出る</li><li>AI のチェックを外すと説明が切り替わる</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">相談</span><span class="ic">⚙ ⋯</span></div>
+        <div class="body">
+          <div><div class="ttl" style="font-weight:700;font-size:14px">店のWebサイトをなんとかしたい</div>
+            <div class="meta"><span>佐藤・2時間前</span><span class="chip ok">募集中</span><span class="chip">🌐 全体公開</span><span class="chip">AI オン</span></div></div>
+          <div class="map">
+            <div class="mh"><span>📍 議論マップ</span><span>▾</span></div>
+            <dl><dt>ゴール</dt><dd>サイトを作り直して予約を増やしたい</dd></dl>
+            <div class="phase"><span class="done">課題整理</span><span class="now">情報集め</span><span>検討</span><span>決定</span><span>実行</span></div>
+            <dl>
+              <dt>流れ</dt><dd>1. 今のサイトの問題点を共有<br>2. 予約システムの有無が論点に</dd>
+              <dt>未決</dt><dd>予算／自分で更新したいか</dd>
+              <dt>次の一歩</dt><dd>参考サイトを3つ挙げる（佐藤）</dd>
+            </dl>
+            <div class="between faint"><span>10分前に更新</span><span style="color:var(--accent)">詳しく見る ›</span></div>
+          </div>
+          <div class="small">小さな飲食店をやっています。今のサイトが古くて…</div>
+          <div class="tags"><span class="tag">#Web制作</span><span class="tag">#マーケ</span></div>
+          <div class="tags"><span class="chip acc">🙋 話聞けます 2</span><span class="chip">💡 詳しい人知ってます 1</span></div>
+          <div class="divider">スレッド</div>
+          <div><b class="small">高橋</b> <span class="faint">1時間前</span><div class="small">予約システムって今使ってますか？</div></div>
+          <div><b class="small">佐藤</b> <span class="faint">50分前</span><div class="small">電話だけです</div></div>
+          <div class="sys">高橋さんが「話聞けます」と反応しました</div>
+          <div><b class="small">伊藤</b> <span class="faint">30分前</span><div class="small"><span style="color:var(--accent)">@中村</span> さんが飲食店のサイト作ってました</div>
+            <div class="row" style="justify-content:flex-end;margin-top:4px"><span class="btn sm ghost">DMで話す</span><span class="btn sm plain">返信</span></div></div>
+        </div>
+        <div class="composer"><span class="ic">＋</span><div class="input">メッセージを入力…</div><span class="ic" style="color:var(--accent)">➤</span></div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-03</span><span class="name">相談詳細（スマホ）</span></div>
+        <ul><li>関係者のみの場合はヘッダーに「🔒 関係者のみ 4人 ›」「管理者閲覧：許可」</li><li>議論マップは折りたためる</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">相談</span></div>
+        <div class="body">
+          <div class="map empty">
+            <div class="mh"><span>📍 議論マップ</span></div>
+            <div class="small">このような項目があれば、議論の流れや全体感と現在位置を出せます</div>
+            <div class="opt"><span class="check on"></span><span class="small">何をしたいか（ゴール）</span></div>
+            <div class="opt"><span class="check"></span><span class="small">今の状況</span></div>
+            <div class="opt"><span class="check"></span><span class="small">期限や予算などの条件</span></div>
+            <div class="opt"><span class="check"></span><span class="small">投稿者以外の発言（1件以上）</span></div>
+            <div class="phase unknown"><span>課題整理</span><span>情報集め</span><span>検討</span><span>決定</span><span>実行</span></div>
+            <div class="faint" style="text-align:center">現在地：未判定</div>
+          </div>
+          <div class="hr"></div>
+          <div class="map">
+            <div class="mh"><span>📍 議論マップ</span><span class="chip">AI オフ</span></div>
+            <div class="small muted">この相談は AI を使わない設定です。投稿者・関係者が手入力できます。</div>
+            <dl>
+              <dt>ゴール</dt><dd><span class="chip acc">入力する</span></dd>
+              <dt>現在地</dt><dd><span class="chip acc">①〜⑤ から選ぶ</span></dd>
+              <dt>決まったこと</dt><dd><span class="chip acc">入力する</span></dd>
+              <dt>未決の論点</dt><dd><span class="chip acc">入力する</span></dd>
+              <dt>次の一歩</dt><dd><span class="chip acc">入力する</span></dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-03</span><span class="name">議論マップの特別な状態</span></div>
+        <ul><li>上：材料がそろう前は枠とチェックリストだけ（MAP-2）</li><li>下：AI オフの相談は手入力（AI-8）</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">議論マップ</span><span class="act">↻ 今すぐ更新</span></div>
+        <div class="body">
+          <div class="between faint"><span>10分前に AI が更新・版 4</span><span style="color:var(--accent)">過去の版 ›</span></div>
+          <div class="list">
+            <div><div class="between"><span class="label">ゴール</span><span class="ic">✎</span></div>サイトを作り直して予約を増やしたい</div>
+            <div><div class="between"><span class="label">現在地</span><span class="ic">✎</span></div>
+              <div class="phase" style="margin-top:4px"><span class="done">課題整理</span><span class="now">情報集め</span><span>検討</span><span>決定</span><span>実行</span></div></div>
+            <div><div class="between"><span class="label">これまでの流れ</span><span class="ic">✎</span></div>1. 今のサイトの問題点を共有<br>2. 予約システムの有無が論点に<br>3. 中村さんが紹介された</div>
+            <div><div class="between"><span class="label">決まったこと</span><span class="row"><span class="chip">手修正</span><span class="ic">✎</span></span></div>・スマホで見やすくする</div>
+            <div><div class="between"><span class="label">未決の論点</span><span class="ic">✎</span></div>・予算　・自分で更新したいか</div>
+            <div><div class="between"><span class="label">次の一歩</span><span class="ic">✎</span></div>・参考サイトを3つ挙げる（佐藤）</div>
+          </div>
+          <div class="hint">手で直した項目には「手修正」と表示され、自動更新では上書きされません</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-04</span><span class="name">議論マップ詳細</span></div>
+        <ul><li>投稿者・関係者が編集できる</li><li>過去の版で流れの変化を振り返れる</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">相談の設定</span></div>
+        <div class="body">
+          <div class="label">ステータス</div>
+          <div class="tags"><span class="chip on">募集中</span><span class="chip">進行中</span><span class="chip">解決</span><span class="chip">クローズ</span></div>
+          <div class="label">公開範囲</div>
+          <div class="opt"><span class="radio"></span><span>🌐 全体に公開</span></div>
+          <div class="between"><div class="opt"><span class="radio on"></span><span>🔒 関係者のみ（4人）</span></div><span class="small" style="color:var(--accent)">関係者 ›</span></div>
+          <div class="hr"></div>
+          <div class="opt"><span class="check on"></span><span><b>管理者の閲覧を許可する</b><br><span class="small muted">調整や仲裁が必要になった場合に備えて、管理者が内容を確認できるようにします</span></span></div>
+          <div class="opt"><span class="check on"></span><span><b>AI を使う</b><br><span class="small muted">オフにすると、以降は AI に送られません。作成済みの議論マップは残ります。</span></span></div>
+          <div class="faint">変更はスレッドに記録されます</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-05</span><span class="name">相談の設定</span></div>
+        <ul><li>投稿者のみ</li><li>全体に広げるときは「過去のやりとりも全員に見えます」の確認（X-02）</li><li>関係者のみに絞るときは B-08 へ</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ============ PC ============ -->
+<section id="pc">
+  <div class="sec-head"><span class="code">B-03</span><h2>相談詳細（PC）</h2><p>768px 以上では左にメニュー、右に議論マップを常に表示します。</p></div>
+  <div class="pc-scroll">
+    <div class="pc">
+      <div class="side">
+        <div class="logo">inner-chat</div>
+        <div class="nav on"><span>相談</span></div>
+        <div class="nav"><span>メンバー</span></div>
+        <div class="nav"><span>DM</span><span class="chip">3</span></div>
+        <div class="nav"><span>通知</span><span class="chip">5</span></div>
+        <div class="nav"><span>マイページ</span></div>
+        <div class="nav"><span>管理</span><span class="faint">管理者のみ</span></div>
+      </div>
+      <div class="main">
+        <div class="top" style="padding:12px 16px"><span class="ic">←</span><span class="title">店のWebサイトをなんとかしたい</span><span class="ic">⚙ ⋯</span></div>
+        <div class="body" style="padding:14px 16px">
+          <div class="meta"><span>佐藤・2時間前</span><span class="chip ok">募集中</span><span class="chip">🌐 全体公開</span><span class="chip">AI オン</span></div>
+          <div>小さな飲食店をやっています。今のサイトが古くて、スマホで見づらいと言われます。予約も電話だけなので、何から手をつければいいか分からない状態です。</div>
+          <div class="tags"><span class="tag">#Web制作</span><span class="tag">#マーケ</span></div>
+          <div class="tags"><span class="chip acc">🙋 話聞けます 2</span><span class="chip">💡 詳しい人知ってます 1</span></div>
+          <div class="divider">スレッド</div>
+          <div class="row" style="align-items:flex-start"><span class="av"></span><div><b class="small">高橋</b> <span class="faint">1時間前</span><div>予約システムって今使ってますか？</div></div></div>
+          <div class="row" style="align-items:flex-start"><span class="av"></span><div><b class="small">佐藤</b> <span class="faint">50分前</span><div>電話だけです</div></div></div>
+          <div class="sys">高橋さんが「話聞けます」と反応しました</div>
+          <div class="row" style="align-items:flex-start"><span class="av"></span><div><b class="small">伊藤</b> <span class="faint">30分前</span><div><span style="color:var(--accent)">@中村</span> さんが飲食店のサイト作ってました</div></div></div>
+        </div>
+        <div class="composer" style="padding:10px 16px"><span class="ic">＋</span><div class="input">メッセージを入力…</div><span class="ic" style="color:var(--accent)">➤</span></div>
+      </div>
+      <div class="right">
+        <div class="map">
+          <div class="mh"><span>📍 議論マップ</span><span>↻ 更新</span></div>
+          <dl><dt>ゴール</dt><dd>サイトを作り直して予約を増やしたい</dd></dl>
+          <div class="phase"><span class="done">課題整理</span><span class="now">情報集め</span><span>検討</span><span>決定</span><span>実行</span></div>
+          <dl>
+            <dt>流れ</dt><dd>1. 問題点を共有<br>2. 予約システムが論点に</dd>
+            <dt>決まった</dt><dd>—</dd>
+            <dt>未決</dt><dd>予算／更新方法</dd>
+            <dt>次の一歩</dt><dd>参考サイトを3つ（佐藤）</dd>
+          </dl>
+          <div class="between faint"><span>10分前</span><span style="color:var(--accent)">過去の版 ›</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 関係者・招待 ============ -->
+<section id="invite">
+  <div class="sec-head"><span class="code">B</span><h2>関係者・関係者招待</h2><p>「関係者のみ」の相談に人を加える流れ。受け取った本人が承認して参加します。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">関係者（4人）</span></div>
+        <div class="body">
+          <div class="btn ghost">＋ 関係者を招待する</div>
+          <div class="label">参加中</div>
+          <div class="list">
+            <div class="row"><span class="av"></span><span class="grow">佐藤 <span class="faint">投稿者</span></span></div>
+            <div class="row"><span class="av"></span><span class="grow">高橋</span><span class="small" style="color:var(--danger)">外す</span></div>
+            <div class="row"><span class="av"></span><span class="grow">伊藤</span><span class="small" style="color:var(--danger)">外す</span></div>
+            <div class="row"><span class="av"></span><span class="grow">自分</span><span class="small muted">この相談から抜ける</span></div>
+          </div>
+          <div class="label">承認待ち</div>
+          <div class="card"><div class="row"><span class="av"></span><div class="grow">中村<div class="faint">招待：伊藤・残り13日</div></div><span class="btn sm plain">取り消す</span></div></div>
+          <div class="label">辞退・期限切れ</div>
+          <div class="row small muted"><span class="av"></span>小林 ・ 辞退</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-06</span><span class="name">関係者</span></div>
+        <ul><li>「外す」「取り消す」は投稿者だけに表示</li><li>本人はいつでも自分から抜けられる</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">関係者を招待</span><span class="act">送る</span></div>
+        <div class="body">
+          <div class="input">🔍 デザイン</div>
+          <div class="list">
+            <div class="opt"><span class="check on"></span><div class="grow">中村<div class="tags"><span class="tag">#デザイン</span><span class="tag">#Web制作</span></div></div></div>
+            <div class="opt"><span class="check"></span><div class="grow">小林<div class="tags"><span class="tag">#デザイン</span><span class="tag">#写真</span></div></div></div>
+          </div>
+          <div class="label">ひとことメッセージ</div>
+          <div class="input tall">デザイン面で意見をもらえると助かります</div>
+          <div class="hint">・相手が承認すると参加します<br>・投稿者にも通知されます</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-07</span><span class="name">関係者を招待</span></div>
+        <ul><li>招待できるのは投稿者・関係者・管理者（管理者は閲覧許可のある相談のみ）</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">関係者のみにする</span><span class="act">決定</span></div>
+        <div class="body">
+          <div class="small">これまでこの相談に参加した人から、関係者に残す人を選んでください。</div>
+          <div class="list">
+            <div class="opt"><span class="check on"></span><div class="grow">高橋<div class="faint">発言 3・話聞けます</div></div></div>
+            <div class="opt"><span class="check on"></span><div class="grow">伊藤<div class="faint">発言 1</div></div></div>
+            <div class="opt"><span class="check"></span><div class="grow">田中<div class="faint">反応のみ</div></div></div>
+          </div>
+          <div class="hint">選んだ人は承認なしでそのまま関係者になります。選ばなかった人は、この相談を見られなくなります。</div>
+          <div class="opt"><span class="check on"></span><span class="small"><b>管理者の閲覧を許可する</b><br><span class="muted">調整や仲裁が必要になった場合に備えて、管理者が内容を確認できるようにします</span></span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-08</span><span class="name">公開範囲を絞る</span></div>
+        <ul><li>すでに会話に参加している人なので承認は不要（D-04）</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">関係者への招待</span></div>
+        <div class="body">
+          <div><b>伊藤さん</b>から招待が届いています</div>
+          <div class="card"><span class="small">デザイン面で意見をもらえると助かります</span></div>
+          <dl class="small" style="margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 10px">
+            <dt class="muted">相談</dt><dd style="margin:0">店のWebサイトをなんとかしたい</dd>
+            <dt class="muted">投稿者</dt><dd style="margin:0">佐藤</dd>
+            <dt class="muted">関係者</dt><dd style="margin:0">佐藤・高橋・伊藤（3人）</dd>
+          </dl>
+          <div class="meta"><span class="chip">🔒 関係者のみ</span><span class="chip">管理者閲覧：許可</span></div>
+          <div class="map">
+            <div class="mh"><span>📍 議論マップ（概要）</span></div>
+            <dl><dt>ゴール</dt><dd>サイトを作り直して予約を増やしたい</dd></dl>
+            <div class="phase"><span class="done">課題整理</span><span class="now">情報集め</span><span>検討</span><span>決定</span><span>実行</span></div>
+            <dl><dt>流れ</dt><dd>問題点の共有 → 予約の仕組みが論点に</dd><dt>未決</dt><dd>予算／更新方法</dd></dl>
+          </div>
+          <div class="faint">本文とスレッドは参加後に見られます ・ 期限：あと13日</div>
+          <div class="btn">参加する</div>
+          <div class="btns"><span class="btn ghost">💬 質問する</span><span class="btn plain">辞退する</span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-09</span><span class="name">関係者招待（承認前）</span></div>
+        <ul><li>議論マップは個人名を伏せ、発言を引用しない概要版（MAP-7）</li><li>AI オフの相談では議論マップ欄なし</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">招待についての質問<div class="faint" style="font-weight:400">店のWebサイト… ／ 伊藤・佐藤</div></span></div>
+        <div class="body">
+          <div class="sys">この会話は招待に紐づいて残ります</div>
+          <div class="bubble me">どのくらいの時間がかかりそうですか？</div>
+          <div class="faint">伊藤</div>
+          <div class="bubble">最初は30分くらい話を聞いてほしいです</div>
+          <div class="faint">佐藤</div>
+          <div class="bubble">オンラインでも大丈夫です！</div>
+        </div>
+        <div style="padding:8px 12px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line)">
+          <div class="row"><div class="input grow">メッセージを入力…</div><span class="ic" style="color:var(--accent)">➤</span></div>
+          <div class="btns"><span class="btn sm">参加する</span><span class="btn sm plain">辞退する</span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">B-10</span><span class="name">招待についての問い合わせ</span></div>
+        <ul><li>招待された人 ⇔ 招待者・投稿者</li><li>会話の中からそのまま承認・辞退できる</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ============ C ============ -->
+<section id="members">
+  <div class="sec-head"><span class="code">C</span><h2>メンバー</h2><p>「誰が何をできるか」を探す画面です。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="title">メンバー（42人）</span></div>
+        <div class="body">
+          <div class="input">🔍 名前・できることで検索</div>
+          <div class="tags"><span class="chip on">すべて</span><span class="chip">相談受付中</span><span class="chip">タグ ▾</span></div>
+          <div class="card"><div class="row"><span class="av"></span><b class="grow">中村</b><span class="chip ok">受付中</span></div><div class="tags"><span class="tag">#Web制作</span><span class="tag">#デザイン</span></div><div class="small muted">飲食店のサイトを中心に作ってます</div></div>
+          <div class="card"><div class="row"><span class="av"></span><b class="grow">鈴木</b><span class="chip warn">ちょっと忙しい</span></div><div class="tags"><span class="tag">#税務</span><span class="tag">#相続</span></div><div class="small muted">税理士です</div></div>
+          <div class="card"><div class="row"><span class="av"></span><b class="grow">田中</b><span class="chip">休止中</span></div><div class="tags"><span class="tag">#子育て</span><span class="tag">#料理</span></div></div>
+        </div>
+        <div class="tabbar"><span>相談</span><span class="on">メンバー</span><span>DM</span><span>マイ</span></div>
+      </div>
+      <figcaption><div class="t"><span class="id">C-01</span><span class="name">メンバー一覧・検索</span></div>
+        <ul><li>タグで絞り込むと「できること」のカタログになる</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">中村</span><span class="ic">⋯</span></div>
+        <div class="body">
+          <div class="row"><span class="av lg"></span><div><b style="font-size:15px">中村 健</b><div><span class="chip ok">相談受付中</span></div></div></div>
+          <div class="small">飲食店のサイトを中心に作ってます</div>
+          <div class="divider">できること</div>
+          <div><div class="between"><b>Web制作</b><span class="small">本職 ・ 経験10年</span></div><div class="small muted">実績：カフェ、居酒屋のサイト</div></div>
+          <div><div class="between"><b>デザイン</b><span class="small">そこそこ</span></div></div>
+          <div class="divider">勉強中・興味あり</div>
+          <div class="tags"><span class="chip">動画編集</span></div>
+          <div class="btn">✉ メッセージを送る</div>
+          <div class="faint" style="text-align:right">⋯ ブロック・通報</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">C-02</span><span class="name">メンバープロフィール</span></div>
+        <ul><li>メール・電話番号は表示しない</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ============ D/E ============ -->
+<section id="dm">
+  <div class="sec-head"><span class="code">D・E</span><h2>DM・通知</h2><p>個別のやりとりと、届いた出来事の一覧です。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="title">メッセージ</span><span class="act">✎</span></div>
+        <div class="body">
+          <div class="input">🔍 検索</div>
+          <div class="list">
+            <div class="row"><span class="av"></span><div class="grow"><div class="between"><b>中村</b><span class="faint">10:24</span></div><div class="small muted">来週どこかで話しましょう</div></div><span class="dot"></span></div>
+            <div class="row"><span class="av"></span><div class="grow"><div class="between"><b>高橋</b><span class="faint">昨日</span></div><div class="small muted">了解です！</div></div></div>
+            <div class="row"><span class="av"></span><div class="grow"><div class="between"><b>町内会イベント（4）</b><span class="faint">月曜</span></div><div class="small muted">伊藤：写真まとめました</div></div></div>
+          </div>
+        </div>
+        <div class="tabbar"><span>相談</span><span>メンバー</span><span class="on">DM</span><span>マイ</span></div>
+      </div>
+      <figcaption><div class="t"><span class="id">D-01</span><span class="name">DM 一覧</span></div>
+        <ul><li>宛先を複数選ぶとグループ DM（D-03）</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">中村</span><span class="ic">⋯</span></div>
+        <div class="body">
+          <div class="card hl small">📎 相談「店のWebサイト…」から</div>
+          <div class="bubble me">先ほどはありがとうございます</div>
+          <div class="bubble">来週どこかで話しましょう</div>
+          <div class="faint" style="text-align:right">既読</div>
+        </div>
+        <div class="composer"><span class="ic">📷 📎</span><div class="input">メッセージを入力…</div><span class="ic" style="color:var(--accent)">➤</span></div>
+      </div>
+      <figcaption><div class="t"><span class="id">D-02</span><span class="name">DM 会話</span></div>
+        <ul><li>DM は AI に送らない</li><li>相談から移った場合は元の相談へのリンクを表示</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="title">通知</span><span class="act small">すべて既読</span></div>
+        <div class="body">
+          <div class="list">
+            <div class="row" style="align-items:flex-start"><span class="dot" style="margin-top:7px"></span><div class="grow">✉ 伊藤さんから関係者招待が届きました<div class="faint">「店のWebサイト…」・5分前</div></div></div>
+            <div class="row" style="align-items:flex-start"><span class="dot" style="margin-top:7px"></span><div class="grow">🙋 高橋さんが「話聞けます」と反応<div class="faint">「店のWebサイト…」・1時間前</div></div></div>
+            <div class="row" style="align-items:flex-start"><span class="dot" style="margin-top:7px"></span><div class="grow">✨ あなたに合いそうな相談があります<div class="faint">「チラシのデザインを…」 #デザイン</div></div></div>
+            <div class="row" style="align-items:flex-start"><span style="width:7px"></span><div class="grow muted">@ 伊藤さんがあなたをメンションしました</div></div>
+            <div class="row" style="align-items:flex-start"><span style="width:7px"></span><div class="grow muted">✅ 中村さんが招待を承認しました</div></div>
+          </div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">E-01</span><span class="name">通知一覧</span></div>
+        <ul><li>おすすめ相談は全体公開かつ AI オンの相談だけ</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ============ F ============ -->
+<section id="mypage">
+  <div class="sec-head"><span class="code">F</span><h2>マイページ</h2><p>自分のプロフィールと各種設定です。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="title">マイページ</span></div>
+        <div class="body">
+          <div class="row"><span class="av lg"></span><div class="grow"><b>佐藤 太郎</b><div><span class="chip ok">相談受付中 ▾</span></div><div class="tags"><span class="tag">#Web制作</span><span class="tag">#写真</span></div></div><span class="small" style="color:var(--accent)">編集 ›</span></div>
+          <div class="list">
+            <div class="between">できること<span class="muted">›</span></div>
+            <div class="between">アカウント（メール・電話）<span class="muted">›</span></div>
+            <div class="between">通知設定<span class="muted">›</span></div>
+            <div class="between">ブロック・ミュート<span class="muted">›</span></div>
+            <div class="between">表示設定（文字サイズ）<span class="muted">›</span></div>
+            <div class="between">ホーム画面に追加<span class="muted">›</span></div>
+          </div>
+          <div class="small muted">ログアウト</div>
+        </div>
+        <div class="tabbar"><span>相談</span><span>メンバー</span><span>DM</span><span class="on">マイ</span></div>
+      </div>
+      <figcaption><div class="t"><span class="id">F-01</span><span class="name">マイページ</span></div>
+        <ul><li>文字サイズは「標準／大」</li><li>PWA のホーム画面追加を案内</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">できること</span><span class="act">保存</span></div>
+        <div class="body">
+          <div class="input">🔍 タグを検索・追加</div>
+          <div class="card">
+            <div class="between"><b>Web制作</b><span class="ic">🗑</span></div>
+            <div class="label">経験</div>
+            <div class="row small"><span class="opt"><span class="radio"></span>少し</span><span class="opt"><span class="radio on"></span>そこそこ</span><span class="opt"><span class="radio"></span>本職</span></div>
+            <div class="label">実績・ひとこと</div>
+            <div class="input">知人の店のサイトを2件</div>
+          </div>
+          <div class="card"><div class="between"><b>写真</b><span class="ic">🗑</span></div><div class="faint">経験・実績は未入力</div></div>
+          <div class="divider">勉強中・興味あり</div>
+          <div class="tags"><span class="chip on">動画編集 ×</span><span class="chip acc">＋ 追加</span></div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">F-03</span><span class="name">できること編集</span></div>
+        <ul><li>経験・実績は任意</li><li>「できる」未満も書ける欄を分ける</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ============ G ============ -->
+<section id="admin">
+  <div class="sec-head"><span class="code">G</span><h2>管理（管理者のみ）</h2><p>招待・メンバー・通報を扱います。</p></div>
+  <div class="board">
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">メンバー管理（42人）</span></div>
+        <div class="body">
+          <div class="input">🔍 検索</div>
+          <div class="tags"><span class="chip on">すべて</span><span class="chip">管理者</span><span class="chip">停止中</span></div>
+          <div class="list">
+            <div class="row"><span class="av"></span><span class="grow">山田（自分）</span><span class="chip acc">管理者</span></div>
+            <div class="row"><span class="av"></span><span class="grow">佐藤</span><span class="chip acc">管理者</span><span class="ic">⋯</span></div>
+            <div class="row"><span class="av"></span><span class="grow">中村<div class="faint">招待：山田 11/1</div></span><span class="ic">⋯</span></div>
+            <div class="row"><span class="av"></span><span class="grow">鈴木</span><span class="chip danger">停止中</span><span class="ic">⋯</span></div>
+          </div>
+          <div class="card">
+            <div class="label">⋯ メニュー（中村）</div>
+            <div>管理者にする</div>
+            <div>停止する</div>
+            <div style="color:var(--danger)">退会させる</div>
+          </div>
+          <div class="faint">最後の管理者は一般に戻せません</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">G-02</span><span class="name">メンバー管理</span></div>
+        <ul><li>管理者は複数人可。格上げ・一般に戻すは管理者だけ</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">招待リンク</span></div>
+        <div class="body">
+          <div class="card">
+            <b>招待リンクを発行</b>
+            <div class="between small"><span class="muted">有効期限</span><span class="input" style="min-height:0;padding:3px 8px">7日 ▾</span></div>
+            <div class="between small"><span class="muted">使用回数</span><span class="input" style="min-height:0;padding:3px 8px">1回 ▾</span></div>
+            <div class="between small"><span class="muted">メモ</span><span class="input" style="min-height:0;padding:3px 8px">中村さん用</span></div>
+            <div class="btn">発行する</div>
+          </div>
+          <div class="label">有効なリンク</div>
+          <div class="card"><div class="between"><b>中村さん用</b><span class="faint">残り5日・未使用</span></div><div class="row"><span class="btn sm ghost">コピー</span><span class="btn sm ghost">共有</span><span class="btn sm plain">無効化</span></div></div>
+          <div class="label">使用済み・無効</div>
+          <div class="small muted">高橋さん用 ・ 11/2 使用（高橋）</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">G-03</span><span class="name">招待リンク</span></div>
+        <ul><li>発行できるのは管理者だけ</li><li>誰がいつ招待したかを記録</li></ul></figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone"><div class="notch"></div>
+        <div class="top"><span class="ic">←</span><span class="title">通報（未対応 1）</span></div>
+        <div class="body">
+          <div class="card hl">
+            <div class="row"><span class="dot"></span><b>未対応</b></div>
+            <div class="small">対象：相談「〇〇」の発言 <span class="chip">🔒 関係者のみ</span></div>
+            <div class="small muted">通報者：高橋 ・ 理由：攻撃的な発言</div>
+            <div class="between"><span class="faint">11/7 21:03</span><span class="btn sm">確認する</span></div>
+          </div>
+          <div class="label">対応済み</div>
+          <div class="small muted">DM（伊藤）・11/1 ・ 注意済み</div>
+          <div class="hint">通報された内容は、管理者閲覧がオフの相談でも確認できます</div>
+        </div>
+      </div>
+      <figcaption><div class="t"><span class="id">G-04</span><span class="name">通報</span></div>
+        <ul><li>対応内容を記録する</li></ul></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<p class="foot">要件：docs/requirements.md ／ 決定記録：docs/decisions.md ／ 画面一覧（テキスト版）：docs/screens.md。配色・アイコン・最終的な文言は今後のデザイン工程で決めます。</p>
+</div>
+
+<script>
+(function () {
+  function syncMarks() {
+    document.querySelectorAll('[data-for]').forEach(function (m) {
+      var inp = document.getElementById(m.getAttribute('data-for'));
+      if (inp) m.classList.toggle('on', inp.checked);
+    });
+    var rel = document.getElementById('b02-rel');
+    var box = document.getElementById('b02-relbox');
+    if (rel && box) box.hidden = !rel.checked;
+    var ai = document.getElementById('b02-ai');
+    var t = document.getElementById('b02-ai-text');
+    if (ai && t) t.textContent = ai.checked
+      ? '内容を AI が要約し、議論の流れを整理します。合いそうな人へのおすすめにも使います（全体公開のみ）'
+      : 'この相談は AI に送られません。議論マップは投稿者・関係者が手入力できます。';
+  }
+  document.addEventListener('change', syncMarks);
+  syncMarks();
+})();
+</script>
