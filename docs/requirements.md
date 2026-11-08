@@ -1,6 +1,6 @@
 # inner-chat 要件定義（v0.5）
 
-> 決定の経緯は [decisions.md](./decisions.md) を参照。
+> 決定の経緯は [decisions.md](./decisions.md)、画面は [screens.md](./screens.md) を参照。
 
 > 知人だけが入れるクローズドなチャット。
 > 「誰が何をできるか」を見える化し、ふわっとした相談から会話が始まる場をつくる。
