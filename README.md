@@ -6,6 +6,7 @@
 - 決定記録：[docs/decisions.md](docs/decisions.md)
 - 画面：[docs/screens.md](docs/screens.md)（HTML 版：[docs/wireframes.html](docs/wireframes.html)）
 - データ設計：[docs/data-model.md](docs/data-model.md)
+- 議論マップの処理フロー：[docs/discussion-map.md](docs/discussion-map.md)
 
 ## 実装済み
 
@@ -26,6 +27,8 @@
 | `/consultations/[id]` | 相談詳細（B-03 の簡易版）：本文・公開範囲・関係者・議論マップの枠。スレッド・反応・設定は次の段階 |
 | `/invitations`, `/invitations/[id]` | 関係者招待の一覧・承認前の画面（B-09 の簡易版）：参加する／辞退する。問い合わせは次の段階 |
 | `/me` | マイページ（簡易版）：ログアウト |
+
+議論マップの自動生成（Edge Function `discussion-map` ＋ 1分ごとの定期処理）。セットアップは [docs/discussion-map.md](docs/discussion-map.md) の 8 章。
 
 画面の例は [docs/screenshots/](docs/screenshots/)（テスト実行時のスマホ表示）。
 
@@ -85,6 +88,8 @@ select public.create_invite_link(interval '7 days', 1, '〇〇さん用');
 
 ## テスト
 
-- DB のアクセスルール：[supabase/tests/](supabase/tests/)（80項目）
+- DB のアクセスルール・議論マップの処理：[supabase/tests/](supabase/tests/)（98項目）
+- 議論マップの処理全体：[tests/discussion-map/integration.ts](tests/discussion-map/integration.ts)（16項目）
+- Claude API の呼び出し：[supabase/functions/discussion-map/claude.test.ts](supabase/functions/discussion-map/claude.test.ts)（11項目）
 - 招待〜ログインの通し：[tests/e2e/onboarding.js](tests/e2e/onboarding.js)（ブラウザで22項目）
 - 相談一覧・投稿・関係者招待：[tests/e2e/consultations.js](tests/e2e/consultations.js)（ブラウザで30項目）

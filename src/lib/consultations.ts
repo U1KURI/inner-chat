@@ -29,7 +29,7 @@ export type DiscussionMap = {
   flow: string[];
   decided: string[];
   open_issues: string[];
-  next_steps: { text: string; who?: string }[] | string[];
+  next_steps: { text: string; who?: string | null; who_name?: string | null }[] | string[];
   missing_items: { key: string; label: string; ok: boolean }[];
   updated_at: string;
   version: number;

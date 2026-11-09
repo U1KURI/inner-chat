@@ -44,7 +44,7 @@ body {
   -webkit-text-size-adjust: 100%;
   line-break: strict; /* 小さい「ょ」などで行が始まらないように */
 }
-h1, h2, p { word-break: auto-phrase; }
+h1, h2, p, dd, li { word-break: auto-phrase; }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 

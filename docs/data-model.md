@@ -189,6 +189,8 @@ erDiagram
 
 ## 6. 議論マップの自動更新の流れ
 
+> 最新の詳しい流れは [discussion-map.md](./discussion-map.md) を参照（以下は設計時の概要）。
+
 ```mermaid
 sequenceDiagram
   participant U as メンバー

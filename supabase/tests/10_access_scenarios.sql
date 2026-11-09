@@ -18,7 +18,7 @@ create or replace function pg_temp.check(cond boolean, label text) returns void 
 begin if not cond then raise exception 'FAIL: %', label; end if; raise notice 'OK: %', label; end $$;
 grant execute on all functions in schema pg_temp to authenticated;
 create temp table tok(name text, t text); grant all on tok to authenticated;
-create temp table ids(name text, id uuid); grant all on ids to authenticated;
+create temp table ids(name text, id uuid); grant all on ids to authenticated, service_role;
 
 -- 招待リンク → 予約 → 登録前フック → 参加
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
@@ -210,5 +210,55 @@ select pg_temp.check(exists (select 1 from jsonb_array_elements(public.member_di
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000a');
 select pg_temp.check(not exists (select 1 from jsonb_array_elements(public.list_consultations('all')) e where e->>'title' = '家族のことで相談'), 'admin feed excludes restricted');
 select pg_temp.check(public.get_consultation((select id from ids where name='r1')) is null, 'admin cannot open when admin_can_view is off');
+-- 議論マップの処理（service_role 専用の関数）
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select pg_temp.expect_fail($q$select public.ai_claim_dirty_maps()$q$, 'members cannot run map jobs');
+reset role;
+set role service_role;
+create temp table claimed as select * from public.ai_claim_dirty_maps(10) as id;
+select pg_temp.check(exists (select 1 from claimed where id = (select id from ids where name='p1')), 'new consultation is claimed immediately');
+select pg_temp.check(not exists (select 1 from claimed where id = (select id from ids where name='r1')), 'AI-off consultation is not claimed');
+select pg_temp.check(not exists (select 1 from public.ai_claim_dirty_maps(10) x where x = (select id from ids where name='p1')), 'claimed map is not claimed twice');
+select pg_temp.check((public.ai_get_map_input((select id from ids where name='p1'))->'participants'->0->>'is_author')::boolean, 'input: P1 is the author');
+-- 処理中に本文が手修正され、新しい発言も来る
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select public.edit_discussion_map((select id from ids where name='p1'), 'goal', '"手で書いたゴール"');
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000d');
+insert into public.consultation_messages (consultation_id, author_id, body) values ((select id from ids where name='p1'), auth.uid(), '印刷所なら紹介できます');
+reset role;
+set role service_role;
+select pg_temp.check(public.ai_apply_map_result((select id from ids where name='p1'),
+  '{"ready": true, "missing_items": [], "goal": "AIのゴール", "phase": 2, "flow": ["相談が投稿された"], "decided": [], "open_issues": ["予算"], "next_steps": [], "preview": {"goal": "チラシを作りたい"}}',
+  null, 'test-model', 100, 50) = 'applied', 'result applied');
+select pg_temp.check((select goal from public.discussion_maps where consultation_id = (select id from ids where name='p1')) = '手で書いたゴール', 'manual goal not overwritten');
+select pg_temp.check((select phase from public.discussion_maps where consultation_id = (select id from ids where name='p1')) = 2 and (select state from public.discussion_maps where consultation_id = (select id from ids where name='p1')) = 'ready', 'phase and state updated');
+select pg_temp.check((select dirty_since from public.discussion_maps where consultation_id = (select id from ids where name='p1')) is not null, 'message during processing keeps map dirty');
+select pg_temp.check((select count(*) from public.ai_runs where model = 'test-model' and status = 'ok') = 1, 'ai run recorded');
+select pg_temp.check((select count(*) from public.discussion_map_versions where consultation_id = (select id from ids where name='p1')) = 2, 'version snapshot saved');
+-- 失敗 → 間隔を空けて再試行
+update public.discussion_maps set dirty_since = now() - interval '4 minutes' where consultation_id = (select id from ids where name='p1');
+select pg_temp.check(exists (select 1 from public.ai_claim_dirty_maps(10) x where x = (select id from ids where name='p1')), 'dirty again after debounce');
+select public.ai_record_map_failure((select id from ids where name='p1'), 'test-model', 'error', 'boom');
+select pg_temp.check(not exists (select 1 from public.ai_claim_dirty_maps(10) x where x = (select id from ids where name='p1')), 'backoff after failure');
+update public.discussion_maps set dirty_since = now() - interval '6 minutes' where consultation_id = (select id from ids where name='p1');
+select pg_temp.check(exists (select 1 from public.ai_claim_dirty_maps(10) x where x = (select id from ids where name='p1')), 'retried after backoff');
+-- 処理中に AI がオフにされたら結果を捨てる
+reset role;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000b');
+select public.set_consultation_ai((select id from ids where name='p1'), false);
+reset role;
+set role service_role;
+select pg_temp.check(public.ai_apply_map_result((select id from ids where name='p1'), '{"ready": false}', null, 'test-model', 1, 1) = 'discarded_ai_off', 'result discarded when AI turned off');
+select pg_temp.check((select state from public.discussion_maps where consultation_id = (select id from ids where name='p1')) = 'disabled', 'map stays disabled');
+-- 招待の期限切れ
+reset role;
+insert into public.consultation_invitations (consultation_id, invitee_id, inviter_id, expires_at)
+values ((select id from ids where name='r1'), '00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-00000000000b', now() - interval '1 day');
+set role service_role;
+select pg_temp.check(public.expire_invitations() = 1, 'expired invitations');
+reset role;
+select pg_temp.check((select count(*) from public.notifications where type = 'invitation_expired') = 1, 'inviter notified of expiry');
 reset role;
 select 'ALL TESTS PASSED';

@@ -16,9 +16,17 @@ function PhaseBar({ phase }: { phase: number | null }) {
   );
 }
 
+function updatedLabel(iso: string): string {
+  const r = relativeTime(iso);
+  return r === "たった今" ? "たった今更新" : `${r}に更新`;
+}
+
 function asText(v: unknown): string {
   if (typeof v === "string") return v;
-  if (v && typeof v === "object" && "text" in v) return String((v as { text: unknown }).text);
+  if (v && typeof v === "object" && "text" in v) {
+    const o = v as { text: unknown; who_name?: unknown };
+    return o.who_name ? `${String(o.text)}（${String(o.who_name)}）` : String(o.text);
+  }
   return "";
 }
 
@@ -60,7 +68,7 @@ export function DiscussionMapBox({ map }: { map: DiscussionMap | null }) {
     <section className="map" aria-label="議論マップ">
       <div className="map-head">
         <span>📍 議論マップ</span>
-        <span className="small muted">{relativeTime(map.updated_at)}に更新</span>
+        <span className="small muted">{updatedLabel(map.updated_at)}</span>
       </div>
       {map.goal && (
         <dl className="map-dl">
