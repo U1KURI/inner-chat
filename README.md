@@ -21,7 +21,11 @@
 | `/welcome/skills` | できること・ひとこと（スキップ可） |
 | `/login` | ログイン（登録済みの連絡先のみ） |
 | `/no-access` | 招待のないアカウント・停止中のアカウント |
-| `/` | 仮のホーム（相談一覧はこれから） |
+| `/` | 相談一覧（B-01）：すべて／自分の／関係者、ステータスで絞り込み、届いた関係者招待のバナー |
+| `/consultations/new` | 相談を投稿（B-02）：公開範囲、関係者の選択（名前・タグで検索）、管理者閲覧、AI 利用、タグ |
+| `/consultations/[id]` | 相談詳細（B-03 の簡易版）：本文・公開範囲・関係者・議論マップの枠。スレッド・反応・設定は次の段階 |
+| `/invitations`, `/invitations/[id]` | 関係者招待の一覧・承認前の画面（B-09 の簡易版）：参加する／辞退する。問い合わせは次の段階 |
+| `/me` | マイページ（簡易版）：ログアウト |
 
 画面の例は [docs/screenshots/](docs/screenshots/)（テスト実行時のスマホ表示）。
 
@@ -81,5 +85,6 @@ select public.create_invite_link(interval '7 days', 1, '〇〇さん用');
 
 ## テスト
 
-- DB のアクセスルール：[supabase/tests/](supabase/tests/)（63項目）
-- 招待〜ログインの通し：[tests/e2e/](tests/e2e/)（ブラウザで20項目）
+- DB のアクセスルール：[supabase/tests/](supabase/tests/)（80項目）
+- 招待〜ログインの通し：[tests/e2e/onboarding.js](tests/e2e/onboarding.js)（ブラウザで22項目）
+- 相談一覧・投稿・関係者招待：[tests/e2e/consultations.js](tests/e2e/consultations.js)（ブラウザで30項目）

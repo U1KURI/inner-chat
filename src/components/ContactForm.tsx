@@ -8,6 +8,7 @@ import { SubmitButton } from "@/components/SubmitButton";
 export function ContactForm({ purpose }: { purpose: "signup" | "login" }) {
   const [state, action] = useActionState<FormState, FormData>(sendCode, {});
   const [kind, setKind] = useState<"email" | "phone">("email");
+  const [value, setValue] = useState(""); // エラーで戻っても入力を残す
   const isEmail = kind === "email";
 
   return (
@@ -26,6 +27,8 @@ export function ContactForm({ purpose }: { purpose: "signup" | "login" }) {
           placeholder={isEmail ? "taro@example.com" : "090-1234-5678"}
           required
           autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
         />
       </div>
       <FormMessage error={state.error} />
@@ -34,12 +37,12 @@ export function ContactForm({ purpose }: { purpose: "signup" | "login" }) {
         {isEmail ? (
           <>
             <span className="muted">メールを使いたくない方は</span>
-            <button type="button" className="link" onClick={() => setKind("phone")}>
+            <button type="button" className="link" onClick={() => { setKind("phone"); setValue(""); }}>
               電話番号（SMS）で{purpose === "signup" ? "登録" : "ログイン"}する
             </button>
           </>
         ) : (
-          <button type="button" className="link" onClick={() => setKind("email")}>
+          <button type="button" className="link" onClick={() => { setKind("email"); setValue(""); }}>
             メールアドレスで{purpose === "signup" ? "登録" : "ログイン"}する
           </button>
         )}

@@ -58,10 +58,12 @@ const ok = (c, label) => { if (!c) throw new Error("FAIL: " + label); console.lo
   await shot(page, "05-skills");
   await page.getByRole("button", { name: "はじめる" }).click();
   await page.waitForURL(BASE + "/");
-  ok(await page.getByText("ようこそ、佐藤 太郎さん").isVisible(), "home after onboarding");
+  ok(await page.getByRole("heading", { name: "相談" }).isVisible(), "home (consultation list) after onboarding");
   await shot(page, "06-home");
   await page.goto(BASE + "/welcome/terms");
   ok(page.url() === BASE + "/", "member cannot reopen onboarding");
+  await page.goto(BASE + "/me");
+  ok(await page.getByText("佐藤 太郎").isVisible(), "my page shows name");
   await page.getByRole("button", { name: "ログアウト" }).click();
   await page.waitForURL("**/login");
   ok(true, "logout");
@@ -73,7 +75,8 @@ const ok = (c, label) => { if (!c) throw new Error("FAIL: " + label); console.lo
   await page.getByLabel("確認コード（6桁）").fill("123456");
   await page.getByRole("button", { name: "確認する" }).click();
   await page.waitForURL(BASE + "/");
-  ok(await page.getByText("ようこそ、佐藤 太郎さん").isVisible(), "login as existing member");
+  await page.goto(BASE + "/me");
+  ok(await page.getByText("佐藤 太郎").isVisible(), "login as existing member");
   await ctx.close();
 
   // ログイン（未登録）
@@ -83,6 +86,7 @@ const ok = (c, label) => { if (!c) throw new Error("FAIL: " + label); console.lo
   await page.getByRole("button", { name: "確認コードを送る" }).click();
   await page.getByText("この連絡先は登録されていません").waitFor();
   ok(true, "unregistered login rejected");
+  ok((await page.getByLabel("メールアドレス").inputValue()) === "stranger@example.com", "email kept after error");
   await shot(page, "07-login-unregistered");
   await ctx.close();
 
@@ -110,7 +114,8 @@ const ok = (c, label) => { if (!c) throw new Error("FAIL: " + label); console.lo
   await page.waitForURL("**/welcome/skills");
   await page.getByRole("link", { name: "あとで" }).click();
   await page.waitForURL(BASE + "/");
-  ok(await page.getByText("ようこそ、高橋さん").isVisible(), "phone signup complete");
+  await page.goto(BASE + "/me");
+  ok(await page.getByText("高橋").isVisible(), "phone signup complete");
   await ctx.close();
 
   // リンクの使用回数（2回）を使い切った

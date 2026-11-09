@@ -9,6 +9,7 @@ export function SkillsForm({ popular }: { popular: string[] }) {
   const [state, action] = useActionState<WelcomeState, FormData>(saveSkills, {});
   const [selected, setSelected] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  const [bio, setBio] = useState("");
 
   const toggle = (name: string) =>
     setSelected((cur) => (cur.includes(name) ? cur.filter((n) => n !== name) : [...cur, name]));
@@ -68,7 +69,14 @@ export function SkillsForm({ popular }: { popular: string[] }) {
 
       <div className="field">
         <label htmlFor="bio">ひとこと（任意）</label>
-        <textarea id="bio" name="bio" maxLength={500} placeholder="例：平日夜なら相談に乗れます" />
+        <textarea
+          id="bio"
+          name="bio"
+          maxLength={500}
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder="例：平日夜なら相談に乗れます"
+        />
       </div>
 
       <FormMessage error={state.error} />

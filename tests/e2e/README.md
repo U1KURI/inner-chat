@@ -19,5 +19,12 @@ NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=du
 INVITE_TOKEN=xxxx node tests/e2e/onboarding.js      # 最後に "E2E PASSED"
 ```
 
+相談一覧・投稿のテストは、メンバー4人を入れた DB で実行する：
+
+```sh
+psql -d <db> -f tests/e2e/seed-consultations.sql
+node tests/e2e/consultations.js      # 最後に "E2E PASSED"
+```
+
 モックはテスト専用で、Supabase の挙動を完全には再現しない（レート制限、メール送信、トークン更新など）。
 本番前に、実際の Supabase プロジェクトでも一度通しで確認すること。
